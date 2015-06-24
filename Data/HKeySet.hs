@@ -72,7 +72,6 @@ union (HKeySet s1) (HKeySet s2) = HKeySet (s1 `S.union` s2)
 {-# INLINE union #-}
 
 -- | Construct a key set containing all elements from a list of key sets.
-unions :: Foldable f => f HKeySet -> HKeySet
 unions = List.foldl' union empty
 {-# INLINE unions #-}
 
