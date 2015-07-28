@@ -173,6 +173,7 @@ module Data.HMap
 where
 import qualified Data.HKey 
 import Prelude hiding (lookup,null)
+import Data.Default
 import Data.Untypeable
 import Data.Unique
 import Data.HKeyPrivate
@@ -181,7 +182,6 @@ import Control.Monad
 import Data.Hashable
 import Data.HashMap.Lazy(HashMap)
 import Data.Typeable(Typeable)
-
 
 import qualified Data.HashMap.Lazy as M
 import Data.Maybe(fromJust,isJust)
@@ -197,7 +197,7 @@ import System.IO.Unsafe
 -- | The type of hetrogenous maps. 
 newtype HMap = HMap (HashMap Unique (Weak HideType)) deriving Typeable
 
-
+instance Default HMap where def = empty
 
 
 {--------------------------------------------------------------------
