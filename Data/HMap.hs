@@ -153,6 +153,7 @@ module Data.HMap
 
             -- ** Delete\/Update
             , delete
+            , deleteUnique
             , adjust
             , update
             , alter
@@ -248,14 +249,16 @@ size (HMap m) = M.size m
 -- or 'Nothing' if the key isn't in the map.
 
 lookup :: HKey x a -> HMap -> Maybe a
-lookup (Key k) (HMap m) =  fmap getVal (M.lookup k m) where
+lookup (Key k) (HMap m) =  join $ fmap getVal (M.lookup k m) where
   -- we know it is alive, how else did we get the key?
-  getVal v = (keepAlive k unsafeFromHideType) -- keep key alive till unsafeFromHideType
-             (unsafePerformIO (liftM fromJust (deRefWeak v)))
+  getVal v = fmap (keepAlive k unsafeFromHideType) -- keep key alive till unsafeFromHideType
+            --  (unsafePerformIO (liftM fromJust (deRefWeak v)))
+             (unsafePerformIO (deRefWeak v))
+  {-# NOINLINE getVal #-}
 
   -- this function keeps the key k alive until computing whnf of application of f to x
-  keepAlive :: a -> (b -> c) -> (b -> c)
-  keepAlive k f x = k `seq` (f x)
+  keepAlive :: a -> (b -> c) -> b -> c
+  keepAlive k f x = k `seq` f x
   {-# NOINLINE keepAlive #-}
 #if __GLASGOW_HASKELL__ >= 700
 {-# INLINABLE lookup #-}
@@ -330,7 +333,7 @@ insert :: HKey s a -> a -> HMap -> HMap
 insert (Key k) a (HMap m) = let v = unsafeMKWeak k (HideType a)
                             in v `seq` HMap (M.insert k v m)
 
-{- NOINLINE unsafeMKWeak -}
+{-# NOINLINE unsafeMKWeak #-}
 unsafeMKWeak k a = unsafePerformIO $ mkWeak k a Nothing
 #if __GLASGOW_HASKELL__ >= 700
 {-# INLINABLE insert #-}
@@ -372,7 +375,10 @@ delete (Key k) (HMap m) = HMap $ M.delete k m
 
 -- | /O(log n)/. Delete a value from the map using Unique instead of HKey
 deleteUnique :: Unique -> HMap -> HMap
-deleteUnique u (HMap m) = HMap $ M.delete u m
+deleteUnique u (HMap m) = finalize' (M.lookup u m) `seq` HMap (M.delete u m)
+    where finalize' Nothing  = ()
+          finalize' (Just v) = unsafePerformIO $ finalize v
+          {-# NOINLINE finalize' #-}
 #if __GLASGOW_HASKELL__ >= 700
 {-# INLINABLE deleteUnique #-}
 #else
@@ -432,8 +438,7 @@ alter f k m = case f (lookup k m) of
 --   (@'unions' == 'Prelude.foldl' 'union' 'empty'@).
 
 unions :: [HMap] -> HMap
-unions ts
-  = foldl union empty ts
+unions = foldl union empty
 #if __GLASGOW_HASKELL__ >= 700
 {-# INLINABLE unions #-}
 #endif
